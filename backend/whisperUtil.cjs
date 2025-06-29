@@ -6,12 +6,20 @@ require('dotenv').config();
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
-// OBS! Inga Configuration eller OpenAIApi!
 
 async function analyzePronunciation(filePath, profile, exerciseId) {
   const audio = fs.createReadStream(filePath);
-  const whisperResp = await openai.createTranscription(audio, "whisper-1", undefined, "json", 0, "pt");
-  const transcript = whisperResp.data.text.trim();
+
+  // Korrekt anrop till Whisper API i nya SDK
+  const whisperResp = await openai.audio.transcriptions.create({
+    file: audio,
+    model: "whisper-1",
+    response_format: "json",
+    language: "pt"
+  });
+
+  // I nya SDK är text på rot-nivå (inte data.text)
+  const transcript = whisperResp.text.trim();
 
   const ex = exercises[profile][exerciseId];
   const ref = ex.text.toLowerCase();
