@@ -6,9 +6,7 @@ require('dotenv').config();
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
-
-const configuration = new Configuration({ apiKey: process.env.OPENAI_API_KEY });
-const openai = new OpenAIApi(configuration);
+// OBS! Inga Configuration eller OpenAIApi!
 
 async function analyzePronunciation(filePath, profile, exerciseId) {
   const audio = fs.createReadStream(filePath);
