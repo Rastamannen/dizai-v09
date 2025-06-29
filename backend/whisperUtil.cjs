@@ -1,13 +1,12 @@
 const { Configuration, OpenAIApi } = require("openai");
 const exercises = require("./exercises.json");
 const fs = require('fs');
-const dotenv = require('dotenv');
-dotenv.config();
+require('dotenv').config();
 
 const configuration = new Configuration({ apiKey: process.env.OPENAI_API_KEY });
 const openai = new OpenAIApi(configuration);
 
-export async function analyzePronunciation(filePath, profile, exerciseId) {
+async function analyzePronunciation(filePath, profile, exerciseId) {
   const audio = fs.createReadStream(filePath);
   const whisperResp = await openai.createTranscription(audio, "whisper-1", undefined, "json", 0, "pt");
   const transcript = whisperResp.data.text.trim();
@@ -40,3 +39,5 @@ export async function analyzePronunciation(filePath, profile, exerciseId) {
     highlight
   };
 }
+
+module.exports = { analyzePronunciation };
