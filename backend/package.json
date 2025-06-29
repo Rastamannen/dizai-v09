@@ -10,4 +10,5 @@
     "openai": "^4.28.4",
     "@google-cloud/text-to-speech": "^4.2.0"
   }
+  
 }
