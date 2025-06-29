@@ -1,10 +1,10 @@
-import express from 'express';
-import multer from 'multer';
-import cors from 'cors';
-import exercises from './exercises.json' assert { type: "json" };
-import { analyzePronunciation } from './whisperUtil.js';
-import { ttsAudio } from './ttsUtil.js';
-import fs from 'fs';
+const express = require('express');
+const multer = require('multer');
+const cors = require('cors');
+const exercises = require('./exercises.json');
+const { analyzePronunciation } = require('./whisperUtil.js');
+const { ttsAudio } = require('./ttsUtil.js');
+const fs = require('fs');
 
 const app = express();
 app.use(cors());
