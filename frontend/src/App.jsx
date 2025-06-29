@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 
+const BACKEND_URL = "https://dizai-v09.onrender.com";
+
 export default function App() {
   const [profile, setProfile] = useState("Johan");
   const [exerciseIdx, setExerciseIdx] = useState(0);
@@ -12,12 +14,12 @@ export default function App() {
   const mediaRecorderRef = useRef();
 
   useEffect(() => {
-    axios.get("https://dizai-v09.onrender.com/exercises").then((res) => setExercises(res.data[profile]));
+    axios.get(`${BACKEND_URL}/exercises`).then((res) => setExercises(res.data[profile]));
   }, [profile]);
 
   useEffect(() => {
     if (exercises.length)
-      setAudioUrl(`/tts?text=${encodeURIComponent(exercises[exerciseIdx].text)}&type=pt-PT`);
+      setAudioUrl(`${BACKEND_URL}/tts?text=${encodeURIComponent(exercises[exerciseIdx].text)}&type=pt-PT`);
   }, [exercises, exerciseIdx]);
 
   const handleRecord = async () => {
@@ -32,7 +34,7 @@ export default function App() {
       formData.append("audio", blob, "audio.webm");
       formData.append("profile", profile);
       formData.append("exerciseId", exerciseIdx);
-      const resp = await axios.post("/analyze", formData);
+      const resp = await axios.post(`${BACKEND_URL}/analyze`, formData);
       setTranscript(resp.data.transcript);
       setFeedback(resp.data.feedback);
       setRecording(false);
