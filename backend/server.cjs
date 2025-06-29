@@ -2,8 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
 const exercises = require('./exercises.json');
-const { analyzePronunciation } = require('./whisperUtil.js');
-const { ttsAudio } = require('./ttsUtil.js');
+const { analyzePronunciation } = require('./whisperUtil.cjs');
+const { ttsAudio } = require('./ttsUtil.cjs');
 const fs = require('fs');
 
 const app = express();
