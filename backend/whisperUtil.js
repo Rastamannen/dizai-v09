@@ -1,7 +1,7 @@
-import { Configuration, OpenAIApi } from "openai";
-import exercises from "./exercises.json" assert { type: "json" };
-import fs from 'fs';
-import dotenv from 'dotenv';
+const { Configuration, OpenAIApi } = require("openai");
+const exercises = require("./exercises.json");
+const fs = require('fs');
+const dotenv = require('dotenv');
 dotenv.config();
 
 const configuration = new Configuration({ apiKey: process.env.OPENAI_API_KEY });
