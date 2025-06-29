@@ -12,7 +12,7 @@ export default function App() {
   const mediaRecorderRef = useRef();
 
   useEffect(() => {
-    axios.get("/exercises").then((res) => setExercises(res.data[profile]));
+    axios.get("https://dizai-v09.onrender.com/exercises").then((res) => setExercises(res.data[profile]));
   }, [profile]);
 
   useEffect(() => {
