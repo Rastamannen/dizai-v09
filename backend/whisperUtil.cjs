@@ -19,10 +19,16 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
     try {
       console.log(`→ Transcription attempt ${attempt}`);
 
-      const audioStream = fs.createReadStream(filePath);
+      const audioBuffer = fs.readFileSync(filePath);
 
       const resp = await openai.audio.transcriptions.create({
-        file: audioStream,
+        file: {
+          value: audioBuffer,
+          options: {
+            filename: "audio.webm",
+            contentType: "audio/webm",
+          },
+        },
         model: "whisper-1",
         response_format: "json",
         language: "pt",
