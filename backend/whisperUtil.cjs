@@ -1,61 +1,48 @@
+const OpenAI = require("openai");
 const exercises = require("./exercises.json");
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+require("dotenv").config();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 async function analyzePronunciation(filePath, profile, exerciseId) {
-  const openai = require("openai");
-  const audio = fs.createReadStream(filePath);
-  const ex = exercises[profile][exerciseId];
-  let attempt = 0;
-  let transcript = null;
-
   console.log(`/analyze: Starting transcription for ${filePath} (exerciseId=${exerciseId}, profile=${profile})`);
 
-  while (attempt < 3) {
-    try {
-      console.log(`→ Transcription attempt ${attempt + 1}`);
-      const resp = await openai.audio.transcriptions.create({
-        file: audio,
-        model: "whisper-1",
-        language: "pt",
-        response_format: "json",
-      });
+  const transcript = await retryAsync(async () => {
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(filePath),
+      model: "whisper-1",
+      language: "pt",
+      response_format: "json"
+    });
 
-      transcript = resp.text.trim();
-      console.log(`✔ Transcription success: "${transcript}"`);
-      break;
-    } catch (err) {
-      console.warn(`⚠️ Retry ${attempt + 1} failed: ${err.message}`);
-      attempt++;
-      await new Promise(res => setTimeout(res, 2000));
+    if (!transcription || !transcription.text) {
+      throw new Error("Missing 'text' in transcription response");
     }
-  }
 
-  if (!transcript) {
-    throw new Error("Transcription failed after 3 retries");
-  }
+    return transcription.text.trim();
+  }, 3, "Transcription");
 
-  // === Simple word match scoring ===
+  const ex = exercises[profile][exerciseId];
   const ref = ex.text.toLowerCase();
   const spoken = transcript.toLowerCase();
-  const refWords = ref.split(/\s+/);
-  const spokenWords = spoken.split(/\s+/);
+
   let score = 0;
   let highlight = [];
-
+  const refWords = ref.split(/\s+/);
+  const spokenWords = spoken.split(/\s+/);
   refWords.forEach((w, i) => {
     if (spokenWords[i] && spokenWords[i] === w) score++;
     else highlight.push(i);
   });
-
   const percent = (score / refWords.length) * 100;
-  let feedback = "";
 
+  let feedback = "";
   if (percent === 100) feedback = "Perfect!";
   else if (percent > 70) feedback = "Almost! Check highlighted words.";
   else feedback = "Try again. Pay attention to pronunciation.";
-
-  console.log(`→ Score: ${percent.toFixed(1)}%. Feedback: ${feedback}`);
 
   return {
     transcript,
@@ -65,6 +52,19 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
     feedback,
     highlight
   };
+}
+
+// Enkel retry-hanterare med tydlig loggning
+async function retryAsync(fn, retries = 3, label = "Operation") {
+  for (let i = 1; i <= retries; i++) {
+    try {
+      console.log(`→ ${label} attempt ${i}`);
+      return await fn();
+    } catch (err) {
+      console.warn(`⚠️ Retry ${i} failed: ${err.message}`);
+      if (i === retries) throw new Error(`${label} failed after ${retries} retries`);
+    }
+  }
 }
 
 module.exports = { analyzePronunciation };
