@@ -1,6 +1,9 @@
-const { OpenAI } = require("openai");
+const OpenAI = require("openai");
 const exercises = require("./exercises.json");
 const fs = require("fs");
+require("dotenv").config();
+
+console.log("✅ OPENAI_API_KEY starts with:", process.env.OPENAI_API_KEY?.slice(0, 8));
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -8,15 +11,17 @@ const openai = new OpenAI({
 
 async function analyzePronunciation(filePath, profile, exerciseId) {
   console.log(`/analyze: Starting transcription for ${filePath} (exerciseId=${exerciseId}, profile=${profile})`);
+  console.log("Analyzing file:", filePath, "Profile:", profile, "ExerciseId:", exerciseId);
 
   const maxRetries = 3;
   let attempt = 0;
-  let transcript = "";
+  let transcript;
 
   while (attempt < maxRetries) {
     attempt++;
     try {
       console.log(`→ Transcription attempt ${attempt}`);
+
       const audioStream = fs.createReadStream(filePath);
 
       const resp = await openai.audio.transcriptions.create({
@@ -26,17 +31,31 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
         language: "pt",
       });
 
-      transcript = (resp.text || "").trim();
+      transcript = resp.text.trim();
+      console.log(`✅ Transcription succeeded: "${transcript}"`);
       break;
     } catch (err) {
       console.error(`⚠️ Retry ${attempt} failed!`);
-      console.error("TRANSCRIBE ERROR:", err.message || err);
+      if (err.cause) {
+        console.error("TRANSCRIBE ERROR:", err.message);
+        console.error("CAUSE:", err.cause);
+      } else {
+        console.error("TRANSCRIBE ERROR:", err);
+      }
       if (attempt === maxRetries) throw new Error("Transcription failed after 3 retries");
     }
   }
 
-  // Grundläggande ordmatchning och feedback
+  if (!transcript) {
+    throw new Error("No transcript generated.");
+  }
+
   const ex = exercises[profile][exerciseId];
+  if (!ex) {
+    console.error(`❌ No exercise found for profile="${profile}" and exerciseId=${exerciseId}`);
+    throw new Error("Exercise not found.");
+  }
+
   const ref = ex.text.toLowerCase();
   const spoken = transcript.toLowerCase();
 
