@@ -1,11 +1,8 @@
-const OpenAI = require("openai");
 const exercises = require("./exercises.json");
 const fs = require("fs");
+const fetch = require("node-fetch");
+const FormData = require("form-data");
 require("dotenv").config();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 async function analyzePronunciation(filePath, profile, exerciseId) {
   console.log(`/analyze: Starting transcription for ${filePath} (exerciseId=${exerciseId}, profile=${profile})`);
@@ -19,22 +16,28 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
     try {
       console.log(`→ Transcription attempt ${attempt}`);
 
-      const audioBuffer = fs.readFileSync(filePath);
+      const form = new FormData();
+      form.append("file", fs.createReadStream(filePath));
+      form.append("model", "whisper-1");
+      form.append("language", "pt");
+      form.append("response_format", "json");
 
-      const resp = await openai.audio.transcriptions.create({
-        file: {
-          value: audioBuffer,
-          options: {
-            filename: "audio.webm",
-            contentType: "audio/webm",
-          },
+      const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          ...form.getHeaders(),
         },
-        model: "whisper-1",
-        response_format: "json",
-        language: "pt",
+        body: form,
       });
 
-      transcript = resp.text.trim();
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`${response.status} ${errText}`);
+      }
+
+      const data = await response.json();
+      transcript = data.text.trim();
       break;
     } catch (err) {
       console.warn(`⚠️ Retry ${attempt} failed: ${err.message}`);
