@@ -1,26 +1,15 @@
-const fs = require("fs");
+const OpenAI = require("openai");
 const exercises = require("./exercises.json");
+const fs = require("fs");
 require("dotenv").config();
 
-// Workaround to support fetch in CommonJS:
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
-globalThis.fetch = fetch;
-
-const OpenAI = require("openai");
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function analyzePronunciation(filePath, profile, exerciseId) {
-  console.log(
-    `/analyze: Starting transcription for ${filePath} (exerciseId=${exerciseId}, profile=${profile})`
-  );
-
+  console.log(`/analyze: Starting transcription for ${filePath} (exerciseId=${exerciseId}, profile=${profile})`);
   const maxRetries = 3;
   let attempt = 0;
   let transcript;
-
   while (attempt < maxRetries) {
     attempt++;
     try {
@@ -33,13 +22,20 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
         response_format: "json",
         language: "pt",
       });
-
       transcript = resp.text.trim();
+      console.log(`Transcription success: "${transcript}"`);
       break;
     } catch (err) {
-      console.warn(`⚠️ Retry ${attempt} failed: ${err.message}`);
-      if (attempt === maxRetries)
-        throw new Error("Transcription failed after 3 retries");
+      console.warn(`⚠️ Retry ${attempt} failed!`);
+      console.error("TRANSCRIBE ERROR:", err.message);
+      if (err.response) console.error("RESPONSE DATA:", JSON.stringify(err.response, null, 2));
+      if (err.cause) console.error("CAUSE:", err.cause);
+      if (attempt === maxRetries) {
+        console.error("Transcription failed after retries:", err.stack || err);
+        throw new Error("Transcription failed after 3 retries: " + (err.message || err));
+      }
+      // Vänta 1 sekund mellan retries
+      await new Promise((r) => setTimeout(r, 1000));
     }
   }
 
@@ -55,10 +51,9 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
     if (spokenWords[i] && spokenWords[i] === w) score++;
     else highlight.push(i);
   });
-
   const percent = (score / refWords.length) * 100;
-  let feedback = "";
 
+  let feedback = "";
   if (percent === 100) feedback = "Perfect!";
   else if (percent > 70) feedback = "Almost! Check highlighted words.";
   else feedback = "Try again. Pay attention to pronunciation.";
