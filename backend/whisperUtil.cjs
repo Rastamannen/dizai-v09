@@ -1,15 +1,18 @@
-const OpenAI = require("openai");
+const { OpenAI } = require("openai");
 const exercises = require("./exercises.json");
 const fs = require("fs");
-require("dotenv").config();
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 async function analyzePronunciation(filePath, profile, exerciseId) {
   console.log(`/analyze: Starting transcription for ${filePath} (exerciseId=${exerciseId}, profile=${profile})`);
+
   const maxRetries = 3;
   let attempt = 0;
-  let transcript;
+  let transcript = "";
+
   while (attempt < maxRetries) {
     attempt++;
     try {
@@ -22,23 +25,17 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
         response_format: "json",
         language: "pt",
       });
-      transcript = resp.text.trim();
-      console.log(`Transcription success: "${transcript}"`);
+
+      transcript = (resp.text || "").trim();
       break;
     } catch (err) {
-      console.warn(`⚠️ Retry ${attempt} failed!`);
-      console.error("TRANSCRIBE ERROR:", err.message);
-      if (err.response) console.error("RESPONSE DATA:", JSON.stringify(err.response, null, 2));
-      if (err.cause) console.error("CAUSE:", err.cause);
-      if (attempt === maxRetries) {
-        console.error("Transcription failed after retries:", err.stack || err);
-        throw new Error("Transcription failed after 3 retries: " + (err.message || err));
-      }
-      // Vänta 1 sekund mellan retries
-      await new Promise((r) => setTimeout(r, 1000));
+      console.error(`⚠️ Retry ${attempt} failed!`);
+      console.error("TRANSCRIBE ERROR:", err.message || err);
+      if (attempt === maxRetries) throw new Error("Transcription failed after 3 retries");
     }
   }
 
+  // Grundläggande ordmatchning och feedback
   const ex = exercises[profile][exerciseId];
   const ref = ex.text.toLowerCase();
   const spoken = transcript.toLowerCase();
