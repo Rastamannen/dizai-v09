@@ -8,36 +8,37 @@ export default function App() {
   const [exerciseIdx, setExerciseIdx] = useState(0);
   const [exercises, setExercises] = useState([]);
   const [feedback, setFeedback] = useState("");
-  const [transcript, setTranscript] = useState("");
   const [highlight, setHighlight] = useState([]);
+  const [transcript, setTranscript] = useState("");
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
-  const mediaRecorderRef = useRef();
 
+  const mediaRecorderRef = useRef();
+  const recordingTimeoutRef = useRef();
+
+  // Ladda övningar
   useEffect(() => {
-    axios.get(`${BACKEND_URL}/exercises`)
-      .then((res) => setExercises(res.data[profile] || []))
-      .catch((err) => {
-        setExercises([]);
-        setFeedback("Error loading exercises.");
-      });
+    axios.get(`${BACKEND_URL}/exercises`).then((res) => setExercises(res.data[profile]));
   }, [profile]);
 
+  // Ladda referensljud
   useEffect(() => {
-    if (exercises.length)
+    if (exercises.length) {
       setAudioUrl(`${BACKEND_URL}/tts?text=${encodeURIComponent(exercises[exerciseIdx].text)}&type=pt-PT`);
+    }
   }, [exercises, exerciseIdx]);
 
+  // Starta inspelning
   const handleRecord = async () => {
     setRecording(true);
     setFeedback("");
     setTranscript("");
     setHighlight([]);
-
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorderRef.current = new window.MediaRecorder(stream);
     let chunks = [];
     mediaRecorderRef.current.ondataavailable = (e) => chunks.push(e.data);
+
     mediaRecorderRef.current.onstop = async () => {
       const blob = new Blob(chunks, { type: "audio/webm" });
       const formData = new FormData();
@@ -53,125 +54,170 @@ export default function App() {
         setFeedback("Error during analysis.");
       }
       setRecording(false);
+      // Frigör mikrofonen
+      if (mediaRecorderRef.current && mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
     };
+
     mediaRecorderRef.current.start();
-    setTimeout(() => {
-      if (mediaRecorderRef.current.state !== "inactive") {
+
+    // Auto-stop efter 3 sekunder
+    recordingTimeoutRef.current = setTimeout(() => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
       }
     }, 3000);
   };
 
-  if (!exercises.length) return <div style={{ fontSize: "2rem", color: "#1d33ad", margin: "2rem" }}>Loading...</div>;
+  // Stoppa inspelning manuellt
+  const handleStop = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+      clearTimeout(recordingTimeoutRef.current);
+    }
+  };
+
+  if (!exercises.length) return <div>Loading...</div>;
   const ex = exercises[exerciseIdx];
 
-  // Highlighting words in transcript
-  let transcriptDisplay = transcript;
-  if (transcript && highlight.length) {
+  // Snygg highlight för feedback (färg beroende på feedback)
+  let feedbackStyle = { color: "orange", fontWeight: 600 };
+  if (feedback === "Perfect!") feedbackStyle = { color: "green", fontWeight: 600 };
+  if (feedback.startsWith("Almost")) feedbackStyle = { color: "#e9a100", fontWeight: 600 };
+  if (feedback.startsWith("Error")) feedbackStyle = { color: "red", fontWeight: 600 };
+
+  // Highlight ord i transcript om highlight-array finns
+  function renderTranscript() {
+    if (!transcript) return null;
     const words = transcript.split(/\s+/);
-    transcriptDisplay = words.map((word, i) =>
-      highlight.includes(i) ?
-        <span key={i} style={{ background: "#ffcccb", fontWeight: "bold" }}>{word + " "}</span>
-        : word + " "
+    return (
+      <span>
+        {words.map((word, idx) => (
+          <span
+            key={idx}
+            style={{
+              background: highlight.includes(idx) ? "#fffd99" : "transparent",
+              color: highlight.includes(idx) ? "#d45900" : "#1639b2",
+              borderRadius: "4px",
+              marginRight: 2,
+              padding: highlight.includes(idx) ? "0 3px" : 0
+            }}
+          >
+            {word + " "}
+          </span>
+        ))}
+      </span>
     );
   }
 
-  // Feedback color logic
-  let feedbackColor = "#1d33ad";
-  if (feedback.startsWith("Perfect")) feedbackColor = "green";
-  else if (feedback.startsWith("Almost")) feedbackColor = "#eab308"; // orange/gold
-  else if (feedback) feedbackColor = "orange";
-
   return (
-    <div style={{ background: "#faf6ea", minHeight: "100vh", fontFamily: "system-ui" }}>
-      <h1 style={{ color: "#1d33ad", fontSize: "2.5rem", margin: "1rem 0 0 1rem" }}>DizAí v0.9</h1>
+    <div style={{ fontFamily: "system-ui, sans-serif", background: "#f9f6ea", minHeight: "100vh", padding: 24 }}>
+      <h1 style={{ color: "#1639b2" }}>DizAí v0.9</h1>
       <button
         style={{
-          margin: "1rem",
-          background: "#263bd6",
-          color: "#fff",
-          fontWeight: "bold",
-          fontSize: "1.5rem",
+          marginBottom: 28,
+          fontWeight: 700,
+          fontSize: 22,
+          background: "#233dc2",
+          color: "white",
           border: "none",
-          borderRadius: "1.2rem",
-          padding: "0.7rem 2.2rem",
-          cursor: "pointer",
+          borderRadius: 24,
+          padding: "10px 32px",
+          cursor: "pointer"
         }}
         onClick={() => setProfile(profile === "Johan" ? "Petra" : "Johan")}
       >
         Switch to {profile === "Johan" ? "Petra" : "Johan"}
       </button>
-      <div style={{ margin: "2rem 1rem 0 1rem" }}>
-        <h2 style={{ fontSize: "2.2rem", color: "#1d33ad" }}>{ex.text}</h2>
-        <div style={{ fontSize: "1.4rem", color: "#1d33ad", margin: "0.7rem 0" }}>
-          IPA: <span style={{ fontFamily: "monospace" }}>{ex.ipa}</span>
-        </div>
-        <audio controls src={audioUrl} style={{ width: "100%", background: "#f3f7fb", borderRadius: 18, margin: "0.6rem 0" }} />
+
+      <div>
+        <h2 style={{ fontSize: 32, color: "#1639b2" }}>{ex.text}</h2>
+        <p style={{ fontSize: 22, color: "#233dc2", marginBottom: 0 }}>
+          IPA: <span style={{ color: "#233dc2" }}>{ex.ipa}</span>
+        </p>
+        <audio controls src={audioUrl} style={{ width: "100%", margin: "16px 0", background: "#f4f8fc" }}></audio>
       </div>
-      <button
-        onClick={handleRecord}
-        disabled={recording}
-        style={{
-          margin: "1.5rem 1rem 0 1rem",
-          background: "#2537a6",
-          color: "#fff",
-          fontWeight: "bold",
-          fontSize: "1.5rem",
-          border: "none",
-          borderRadius: "1rem",
-          padding: "0.7rem 2.2rem",
-          cursor: recording ? "wait" : "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.7rem",
-        }}
-      >
-        <span role="img" aria-label="mic">🎙️</span>
-        {recording ? "Recording..." : "Record"}
-      </button>
-      <div style={{ margin: "2rem 1rem 0 1rem", fontSize: "1.35rem", color: "#1d33ad" }}>
-        <strong>Transcript:</strong> {transcriptDisplay}
+
+      <div style={{ marginBottom: 16 }}>
+        <button
+          onClick={handleRecord}
+          disabled={recording}
+          style={{
+            fontWeight: 700,
+            fontSize: 22,
+            background: recording ? "#b5b5b5" : "#233dc2",
+            color: "white",
+            border: "none",
+            borderRadius: 20,
+            padding: "10px 32px",
+            marginRight: 10,
+            cursor: recording ? "not-allowed" : "pointer"
+          }}
+        >
+          <span role="img" aria-label="mic">🎙️</span> Record
+        </button>
+        {recording && (
+          <button
+            onClick={handleStop}
+            style={{
+              fontWeight: 700,
+              fontSize: 22,
+              background: "#ff8800",
+              color: "white",
+              border: "none",
+              borderRadius: 20,
+              padding: "10px 32px",
+              cursor: "pointer"
+            }}
+          >
+            ⏹️ Stop
+          </button>
+        )}
       </div>
-      {feedback &&
-        <div style={{
-          margin: "1.2rem 1rem 0 1rem",
-          fontWeight: "bold",
-          fontSize: "1.6rem",
-          color: feedbackColor
-        }}>{feedback}</div>
-      }
-      <div style={{ margin: "2.5rem 1rem" }}>
+
+      <div style={{ fontSize: 22, marginBottom: 8 }}>
+        <span style={{ color: "#233dc2", fontWeight: 700 }}>Transcript:</span>{" "}
+        {renderTranscript()}
+      </div>
+      {feedback && (
+        <div style={feedbackStyle}>{feedback}</div>
+      )}
+
+      <div style={{ marginTop: 32 }}>
         <button
           disabled={exerciseIdx === 0}
           onClick={() => setExerciseIdx(exerciseIdx - 1)}
           style={{
-            marginRight: "1.2rem",
-            background: "#a8ac8b",
+            background: "#aab088",
             color: "#fff",
-            fontWeight: "bold",
-            fontSize: "1.5rem",
+            fontSize: 24,
             border: "none",
-            borderRadius: "1.2rem",
-            padding: "0.7rem 2.2rem",
+            borderRadius: 18,
+            padding: "6px 26px",
+            marginRight: 18,
             opacity: exerciseIdx === 0 ? 0.5 : 1,
-            cursor: exerciseIdx === 0 ? "not-allowed" : "pointer"
+            fontWeight: 600
           }}
-        >Prev</button>
+        >
+          Prev
+        </button>
         <button
           disabled={exerciseIdx === exercises.length - 1}
           onClick={() => setExerciseIdx(exerciseIdx + 1)}
           style={{
-            background: "#1d33ad",
+            background: "#233dc2",
             color: "#fff",
-            fontWeight: "bold",
-            fontSize: "1.5rem",
+            fontSize: 24,
             border: "none",
-            borderRadius: "1.2rem",
-            padding: "0.7rem 2.2rem",
+            borderRadius: 18,
+            padding: "6px 26px",
             opacity: exerciseIdx === exercises.length - 1 ? 0.5 : 1,
-            cursor: exerciseIdx === exercises.length - 1 ? "not-allowed" : "pointer"
+            fontWeight: 600
           }}
-        >Next</button>
+        >
+          Next
+        </button>
       </div>
     </div>
   );
