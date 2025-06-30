@@ -1,59 +1,68 @@
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
-const exercises = require("./exercises.json");
-const { analyzePronunciation } = require("./whisperUtil.cjs");
-const { ttsAudio } = require("./ttsUtil.cjs");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
 
+const exercises = require("./exercises.json");
+const { analyzePronunciation } = require("./whisperUtil.cjs");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
 const upload = multer({ dest: "uploads/" });
 
-const PORT = 3001;
+const OpenAI = require("openai");
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 🔐 Check OpenAI API key on startup
-if (process.env.OPENAI_API_KEY) {
-  console.log(`✅ OPENAI_API_KEY loaded (starts with: ${process.env.OPENAI_API_KEY.slice(0, 8)}...)`);
-} else {
-  console.warn("⚠️  No OPENAI_API_KEY found in .env");
-}
+// === STARTUP: OpenAI test ===
+(async () => {
+  try {
+    const models = await openai.models.list();
+    console.log("✅ OpenAI API reachable. Models:", models.data.map((m) => m.id).join(", "));
+  } catch (err) {
+    console.error("❌ OpenAI API UNREACHABLE:", err.message);
+  }
+})();
 
-// === /analyze ===
+// === ROUTES ===
+
+// /analyze
 app.post("/analyze", upload.single("audio"), async (req, res) => {
-  const { profile, exerciseId } = req.body;
   const filePath = req.file?.path;
+  const profile = req.body.profile;
+  const exerciseId = req.body.exerciseId;
 
   console.log(`Received /analyze request`);
   console.log(`Processing file: ${filePath} for profile=${profile} exerciseId=${exerciseId}`);
 
-  if (!filePath) {
-    return res.status(400).json({ error: "Missing audio file." });
+  if (!filePath || !profile || exerciseId === undefined) {
+    return res.status(400).json({ error: "Missing required parameters" });
   }
 
   try {
     const result = await analyzePronunciation(filePath, profile, exerciseId);
-    fs.unlinkSync(filePath);
+    fs.unlink(filePath, () => {}); // Cleanup
     res.json(result);
   } catch (err) {
-    console.error("Error in /analyze:", err);
+    console.error("❌ Error in /analyze:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// === /exercises ===
+// /exercises
 app.get("/exercises", (req, res) => {
   res.json(exercises);
 });
 
-// === /tts ===
+// /tts
+const { ttsAudio } = require("./ttsUtil.cjs");
+
 app.get("/tts", async (req, res) => {
   const { text, type } = req.query;
   console.log(`/tts request for text="${text}" type="${type}"`);
-
   try {
     const audioBuffer = await ttsAudio(text, type || "pt-PT");
     res.set({
@@ -62,12 +71,12 @@ app.get("/tts", async (req, res) => {
     });
     res.send(audioBuffer);
   } catch (err) {
-    console.error("Error in /tts:", err);
+    console.error("❌ Error in /tts:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// === /test ===
+// /test-transcription (optional test route)
 app.get("/test", async (req, res) => {
   const profile = req.query.profile || "Johan";
   const exerciseId = parseInt(req.query.exerciseId) || 0;
@@ -79,12 +88,13 @@ app.get("/test", async (req, res) => {
     const result = await analyzePronunciation(filePath, profile, exerciseId);
     res.json(result);
   } catch (err) {
-    console.error("❌ Error in /test:", err);
+    console.error("❌ Error in /test:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// === Start server ===
-app.listen(PORT, () => {
-  console.log(`✅ Backend live on http://localhost:${PORT}`);
+// START SERVER
+const port = 3001;
+app.listen(port, () => {
+  console.log(`✅ Backend live on http://localhost:${port}`);
 });
