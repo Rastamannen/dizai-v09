@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
-import "./index.css"; // Stilar från tidigare
-import { ReactComponent as Logo } from "./assets/DizAi_FullLogo.svg";
+import "./index.css";
+import logoUrl from "./assets/DizAi_FullLogo.svg";
 
 const FEEDBACK_COLORS = {
   perfect: "#197d1d",
@@ -27,33 +27,30 @@ export default function App() {
   const [mediaStream, setMediaStream] = useState(null);
   const mediaRecorderRef = useRef();
 
-  // Hämta övningar för rätt profil
   useEffect(() => {
     axios.get("/exercises").then((res) => setExercises(res.data[profile]));
   }, [profile]);
 
-  // Hämta TTS-url för aktuell övning
   useEffect(() => {
-    if (exercises.length)
+    setTranscript("");
+    setFeedback("");
+    if (exercises.length) {
       setAudioUrl(`/tts?text=${encodeURIComponent(exercises[exerciseIdx].text)}&type=pt-PT`);
+    }
   }, [exercises, exerciseIdx]);
 
-  // Stoppa och släpp mikrofonen
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => track.stop());
+  // Release mic after each recording
+  useEffect(() => {
+    if (!recording && mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
       setMediaStream(null);
     }
-  };
+  }, [recording, mediaStream]);
 
-  // Starta inspelning
   const handleRecord = async () => {
-    setFeedback("");
-    setTranscript("");
     setRecording(true);
+    setTranscript("");
+    setFeedback("");
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     setMediaStream(stream);
     mediaRecorderRef.current = new window.MediaRecorder(stream);
@@ -69,172 +66,101 @@ export default function App() {
         const resp = await axios.post("/analyze", formData);
         setTranscript(resp.data.transcript);
         setFeedback(resp.data.feedback);
-      } catch {
+        setRecording(false);
+      } catch (err) {
         setFeedback("Error during analysis.");
-      }
-      setRecording(false);
-      // Släpp mikrofonen
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop());
-        setMediaStream(null);
+        setRecording(false);
       }
     };
     mediaRecorderRef.current.start();
   };
 
+  const handleStop = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    }
+  };
+
   if (!exercises.length) return <div className="loading">Loading...</div>;
   const ex = exercises[exerciseIdx];
 
-  // Helper för att highlighta felaktiga ord
+  // Helper: highlight words by index
   function renderTranscript() {
-    if (!transcript) return null;
-    if (!ex.highlight || !Array.isArray(ex.highlight) || ex.highlight.length === 0) {
-      return <span>{transcript}</span>;
-    }
-    const userWords = transcript.split(/\s+/);
-    return userWords.map((word, i) => {
-      const isWrong = ex.highlight.includes(i);
-      return (
-        <span
-          key={i}
-          style={{
-            background: isWrong ? "#ffe0e0" : undefined,
-            color: isWrong ? "#D1495B" : undefined,
-            borderRadius: "4px",
-            padding: isWrong ? "0 2px" : 0,
-            fontWeight: isWrong ? "bold" : undefined
-          }}
-        >
-          {word + " "}
-        </span>
-      );
-    });
+    if (!ex.transcript || !ex.highlight || !Array.isArray(ex.highlight)) return transcript;
+    const words = transcript.split(/\s+/);
+    return words.map((word, idx) =>
+      ex.highlight.includes(idx) ?
+        <span key={idx} style={{ background: "#FFD580", color: "#D1495B", fontWeight: 700 }}>{word} </span>
+        : word + " "
+    );
   }
 
   return (
-    <div className="app-root" style={{ background: "#F7F3E9", minHeight: "100vh", fontFamily: "'Nunito Sans', Poppins, Quicksand, Rubik, sans-serif" }}>
-      {/* Logo i toppen */}
+    <div className="dizai-app">
       <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 0 0 16px" }}>
-        <Logo height={48} />
-        <span style={{ fontSize: "2.2rem", color: "#0033A0", fontWeight: 800 }}>DizAí v0.9</span>
+        <img src={logoUrl} alt="DizAi logo" style={{ height: 48, marginRight: 18 }} />
+        <span style={{ fontSize: "2.2rem", color: "#0033A0", fontWeight: 800, fontFamily: "Nunito Sans, sans-serif" }}>
+          DizAí v0.9
+        </span>
       </header>
-      <main style={{ maxWidth: 540, margin: "0 auto", background: "#F7F3E9", borderRadius: 12, padding: 24 }}>
+
+      <main style={{ padding: 20 }}>
         <button
-          style={{
-            background: "#0033A0",
-            color: "#fff",
-            border: "none",
-            borderRadius: 18,
-            padding: "12px 26px",
-            fontWeight: 700,
-            fontSize: 20,
-            marginBottom: 22,
-            marginTop: 8,
-            cursor: "pointer"
-          }}
+          className="profile-btn"
           onClick={() => setProfile(profile === "Johan" ? "Petra" : "Johan")}
         >
           Switch to {profile === "Johan" ? "Petra" : "Johan"}
         </button>
-
-        <h2 style={{ fontSize: "2rem", color: "#0033A0", marginTop: 24, marginBottom: 10 }}>{ex.text}</h2>
-        <div style={{ fontSize: "1.15rem", color: "#0033A0", marginBottom: 6 }}>
-          <span style={{ fontWeight: 700 }}>IPA:</span> <span style={{ fontFamily: "monospace", letterSpacing: 1 }}>{ex.ipa}</span>
+        <h2 className="exercise-text">{ex.text}</h2>
+        <div className="ipa">
+          IPA: <span style={{ color: "#0033A0", fontWeight: 600 }}>{ex.ipa}</span>
         </div>
-        <div style={{ fontSize: "1.1rem", color: "#0033A0", marginBottom: 24 }}>
-          <span style={{ fontWeight: 700 }}>Respelling:</span> <span style={{ fontFamily: "monospace", letterSpacing: 1 }}>{ex.respelling || "-"}</span>
-        </div>
-
-        <div style={{ background: "#f3f6fa", borderRadius: 32, padding: 16, marginBottom: 18 }}>
-          <audio controls src={audioUrl} style={{ width: "100%" }} />
-        </div>
-        <div style={{ display: "flex", gap: 12 }}>
+        <audio controls src={audioUrl} style={{ width: "100%", background: "#F6F9FF", margin: "18px 0 16px 0" }}></audio>
+        <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
           <button
-            style={{
-              background: "#0033A0",
-              color: "#fff",
-              border: "none",
-              borderRadius: 20,
-              fontWeight: 700,
-              fontSize: 22,
-              padding: "10px 28px",
-              marginBottom: 10,
-              cursor: recording ? "not-allowed" : "pointer"
-            }}
+            className="record-btn"
             onClick={handleRecord}
             disabled={recording}
+            style={{
+              background: recording ? "#D49F1B" : "#0033A0",
+              color: "#fff",
+              fontWeight: 700
+            }}
           >
-            <span role="img" aria-label="mic">🎙️</span> {recording ? "Recording..." : "Record"}
+            {recording ? "Recording..." : "🎙️ Record"}
           </button>
-          {recording && (
-            <button
-              onClick={stopRecording}
-              style={{
-                background: "#D1495B",
-                color: "#fff",
-                border: "none",
-                borderRadius: 18,
-                fontWeight: 600,
-                fontSize: 18,
-                padding: "10px 18px",
-                cursor: "pointer"
-              }}>
+          {recording &&
+            <button className="stop-btn" onClick={handleStop} style={{ background: "#D1495B", color: "#fff" }}>
               Stop
             </button>
-          )}
+          }
         </div>
-
-        <div style={{ fontSize: "1.2rem", color: "#0033A0", fontWeight: 700, margin: "18px 0 2px 0" }}>Transcript:</div>
-        <div style={{ fontSize: "1.2rem", marginBottom: 10 }}>{renderTranscript()}</div>
-
-        {feedback && (
-          <div
-            style={{
-              fontWeight: 700,
-              color: getFeedbackColor(feedback),
-              fontSize: "1.25rem",
-              margin: "8px 0 12px 0"
-            }}
-          >
-            {feedback}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 14 }}>
+        <div className="transcript">
+          <span style={{ fontWeight: 700, color: "#0033A0" }}>Transcript:</span>{" "}
+          {transcript ? renderTranscript() : ""}
+        </div>
+        <div className="feedback" style={{
+          fontWeight: 700,
+          fontSize: "1.2rem",
+          color: getFeedbackColor(feedback),
+          margin: "10px 0"
+        }}>
+          {feedback}
+        </div>
+        <div style={{ display: "flex", gap: 16 }}>
           <button
-            style={{
-              background: "#8E9775",
-              color: "#fff",
-              border: "none",
-              borderRadius: 18,
-              padding: "10px 22px",
-              fontWeight: 700,
-              fontSize: 20,
-              marginTop: 12,
-              cursor: exerciseIdx === 0 ? "not-allowed" : "pointer"
-            }}
+            className="nav-btn"
             disabled={exerciseIdx === 0}
             onClick={() => setExerciseIdx(exerciseIdx - 1)}
-          >
-            Prev
-          </button>
+            style={{ background: "#8E9775", color: "#fff", fontWeight: 700 }}
+          >Prev</button>
           <button
-            style={{
-              background: "#0033A0",
-              color: "#fff",
-              border: "none",
-              borderRadius: 18,
-              padding: "10px 22px",
-              fontWeight: 700,
-              fontSize: 20,
-              marginTop: 12,
-              cursor: exerciseIdx === exercises.length - 1 ? "not-allowed" : "pointer"
-            }}
+            className="nav-btn"
             disabled={exerciseIdx === exercises.length - 1}
             onClick={() => setExerciseIdx(exerciseIdx + 1)}
-          >
-            Next
-          </button>
+            style={{ background: "#0033A0", color: "#fff", fontWeight: 700 }}
+          >Next</button>
         </div>
       </main>
     </div>
