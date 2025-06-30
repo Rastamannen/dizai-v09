@@ -10,20 +10,31 @@ const openai = new OpenAI({
 async function analyzePronunciation(filePath, profile, exerciseId) {
   console.log(`/analyze: Starting transcription for ${filePath} (exerciseId=${exerciseId}, profile=${profile})`);
 
-  const transcript = await retryAsync(async () => {
-    const transcription = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(filePath),
-      model: "whisper-1",
-      language: "pt",
-      response_format: "json"
-    });
+  const maxRetries = 3;
+  let attempt = 0;
+  let transcript;
 
-    if (!transcription || !transcription.text) {
-      throw new Error("Missing 'text' in transcription response");
+  while (attempt < maxRetries) {
+    attempt++;
+    try {
+      console.log(`→ Transcription attempt ${attempt}`);
+
+      const audioStream = fs.createReadStream(filePath);
+
+      const resp = await openai.audio.transcriptions.create({
+        file: audioStream,
+        model: "whisper-1",
+        response_format: "json",
+        language: "pt",
+      });
+
+      transcript = resp.text.trim();
+      break;
+    } catch (err) {
+      console.warn(`⚠️ Retry ${attempt} failed: ${err.message}`);
+      if (attempt === maxRetries) throw new Error("Transcription failed after 3 retries");
     }
-
-    return transcription.text.trim();
-  }, 3, "Transcription");
+  }
 
   const ex = exercises[profile][exerciseId];
   const ref = ex.text.toLowerCase();
@@ -50,21 +61,8 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
     ipa: ex.ipa,
     score: percent,
     feedback,
-    highlight
+    highlight,
   };
-}
-
-// Enkel retry-hanterare med tydlig loggning
-async function retryAsync(fn, retries = 3, label = "Operation") {
-  for (let i = 1; i <= retries; i++) {
-    try {
-      console.log(`→ ${label} attempt ${i}`);
-      return await fn();
-    } catch (err) {
-      console.warn(`⚠️ Retry ${i} failed: ${err.message}`);
-      if (i === retries) throw new Error(`${label} failed after ${retries} retries`);
-    }
-  }
 }
 
 module.exports = { analyzePronunciation };
