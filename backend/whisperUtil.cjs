@@ -1,28 +1,41 @@
 const OpenAI = require("openai");
 const exercises = require("./exercises.json");
 const fs = require("fs");
+const { execSync } = require("child_process");
+const path = require("path");
 require("dotenv").config();
 
-console.log("✅ OPENAI_API_KEY starts with:", process.env.OPENAI_API_KEY?.slice(0, 8));
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function convertToWav(inputPath) {
+  const outputPath = inputPath + ".wav";
+  // Skriv över om redan finns (garanterat temporär)
+  try {
+    execSync(`ffmpeg -y -i "${inputPath}" -ar 16000 -ac 1 -c:a pcm_s16le "${outputPath}"`);
+  } catch (e) {
+    console.error("❌ FFmpeg failed!", e.stderr?.toString() || e.message);
+    throw new Error("Could not convert audio to WAV (ffmpeg error).");
+  }
+  return outputPath;
+}
 
 async function analyzePronunciation(filePath, profile, exerciseId) {
   console.log(`/analyze: Starting transcription for ${filePath} (exerciseId=${exerciseId}, profile=${profile})`);
-  console.log("Analyzing file:", filePath, "Profile:", profile, "ExerciseId:", exerciseId);
+
+  // Konvertera till WAV
+  const wavPath = convertToWav(filePath);
+  console.log(`Converted ${filePath} to ${wavPath} for Whisper API`);
 
   const maxRetries = 3;
   let attempt = 0;
-  let transcript;
+  let transcript = "";
+  let lastError = null;
 
   while (attempt < maxRetries) {
     attempt++;
     try {
       console.log(`→ Transcription attempt ${attempt}`);
-
-      const audioStream = fs.createReadStream(filePath);
+      const audioStream = fs.createReadStream(wavPath);
 
       const resp = await openai.audio.transcriptions.create({
         file: audioStream,
@@ -32,30 +45,23 @@ async function analyzePronunciation(filePath, profile, exerciseId) {
       });
 
       transcript = resp.text.trim();
-      console.log(`✅ Transcription succeeded: "${transcript}"`);
-      break;
+      break; // Success
     } catch (err) {
-      console.error(`⚠️ Retry ${attempt} failed!`);
-      if (err.cause) {
-        console.error("TRANSCRIBE ERROR:", err.message);
-        console.error("CAUSE:", err.cause);
-      } else {
-        console.error("TRANSCRIBE ERROR:", err);
+      lastError = err;
+      console.warn(`⚠️ Retry ${attempt} failed!`);
+      console.warn("TRANSCRIBE ERROR:", err.message || err);
+      if (err.response?.data) {
+        console.warn("TRANSCRIBE RESPONSE:", err.response.data);
       }
       if (attempt === maxRetries) throw new Error("Transcription failed after 3 retries");
     }
   }
 
-  if (!transcript) {
-    throw new Error("No transcript generated.");
-  }
+  // Ta bort den temporära WAV-filen efteråt
+  try { fs.unlinkSync(wavPath); } catch (e) {}
 
+  // ----- ANALYS (samma som förut) -----
   const ex = exercises[profile][exerciseId];
-  if (!ex) {
-    console.error(`❌ No exercise found for profile="${profile}" and exerciseId=${exerciseId}`);
-    throw new Error("Exercise not found.");
-  }
-
   const ref = ex.text.toLowerCase();
   const spoken = transcript.toLowerCase();
 
