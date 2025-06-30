@@ -12,45 +12,38 @@ app.use(cors());
 app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 
-function logError(context, err) {
-  console.error(`\n=== ERROR: ${context} ===`);
-  if (err instanceof Error) {
-    console.error('Message:', err.message);
-    console.error('Stack:', err.stack);
-    if (err.response) console.error('Response:', JSON.stringify(err.response, null, 2));
-    if (err.cause) console.error('Cause:', err.cause);
-  } else {
-    console.error('Err (raw):', JSON.stringify(err, null, 2));
-  }
+// ========= Logging helper ==========
+function log(...args) {
+  console.log(new Date().toISOString(), ...args);
 }
 
+// === /analyze ===
 app.post('/analyze', upload.single('audio'), async (req, res) => {
-  console.log(`/analyze: body:`, req.body, "file:", req.file ? req.file.originalname : 'No file');
+  log('Received /analyze request');
   try {
-    if (!req.file) throw new Error("No file received in upload!");
+    const { profile, exerciseId } = req.body;
     const filePath = req.file.path;
-    console.log("Analyzing file:", filePath, "Profile:", req.body.profile, "ExerciseId:", req.body.exerciseId);
-
-    // Extra: kolla filstorlek
-    const stats = fs.statSync(filePath);
-    console.log(`File size: ${stats.size} bytes`);
-
-    const result = await analyzePronunciation(filePath, req.body.profile, req.body.exerciseId);
-    fs.unlinkSync(filePath);
+    log(`Processing file: ${filePath} for profile=${profile} exerciseId=${exerciseId}`);
+    log('File size:', fs.statSync(filePath).size, 'bytes');
+    const result = await analyzePronunciation(filePath, profile, exerciseId);
+    fs.unlinkSync(filePath); // remove uploaded webm
+    log('Done. Deleted original file:', filePath);
     res.json(result);
   } catch (err) {
-    logError('/analyze', err);
-    res.status(500).json({ error: err.message, details: err.stack });
+    log('❌ Error in /analyze:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
+// === /exercises ===
 app.get('/exercises', (req, res) => {
   res.json(exercises);
 });
 
+// === /tts ===
 app.get('/tts', async (req, res) => {
   const { text, type } = req.query;
-  console.log(`/tts request for text="${text}" type="${type}"`);
+  log(`/tts request for text="${text}" type="${type}"`);
   try {
     const audioBuffer = await ttsAudio(text, type || "pt-PT");
     res.set({
@@ -59,11 +52,26 @@ app.get('/tts', async (req, res) => {
     });
     res.send(audioBuffer);
   } catch (err) {
-    logError('/tts', err);
-    res.status(500).json({ error: err.message, details: err.stack });
+    log('❌ Error in /tts:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// === /test === (valfritt, för curl-test)
+app.get("/test", async (req, res) => {
+  const profile = req.query.profile || "Johan";
+  const exerciseId = parseInt(req.query.exerciseId) || 0;
+  const filePath = path.join(__dirname, "sample-audio.webm");
+  log(`/test: Analyzing sample audio for ${profile}, ex ${exerciseId}`);
+  try {
+    const result = await analyzePronunciation(filePath, profile, exerciseId);
+    res.json(result);
+  } catch (err) {
+    log("❌ Error in /test:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
 app.listen(3001, () => {
-  console.log('✅ Backend live on http://localhost:3001');
+  log('✅ Backend live on http://localhost:3001');
 });
