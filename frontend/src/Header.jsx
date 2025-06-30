@@ -3,17 +3,7 @@ import FullLogo from "./assets/DizAi_FullLogo.svg?react";
 
 export default function Header() {
   return (
-    <header
-      style={{
-        background: "#F7F3E9",
-        padding: "20px 0 12px 0",
-        display: "flex",
-        alignItems: "center",
-        borderBottom: "2px solid #0033A0",
-        marginBottom: 24,
-        gap: 18,
-      }}
-    >
+    <header>
       <div style={{ marginLeft: 24 }}>
         <FullLogo style={{ height: 44, verticalAlign: "middle" }} />
       </div>
