@@ -3,6 +3,8 @@ import axios from "axios";
 import "./index.css";
 import logoUrl from "./assets/DizAi_FullLogo.svg";
 
+const BACKEND_URL = "https://dizai-v09.onrender.com"; // <- Använd denna överallt
+
 const FEEDBACK_COLORS = {
   perfect: "#197d1d",
   almost: "#D49F1B",
@@ -28,17 +30,18 @@ export default function App() {
   const mediaRecorderRef = useRef();
 
   useEffect(() => {
-    axios.get("/exercises").then((res) => setExercises(res.data[profile]));
+    axios.get(`${BACKEND_URL}/exercises`).then((res) => setExercises(res.data[profile]));
   }, [profile]);
 
   useEffect(() => {
     setTranscript("");
     setFeedback("");
     if (exercises.length) {
-      setAudioUrl(`/tts?text=${encodeURIComponent(exercises[exerciseIdx].text)}&type=pt-PT`);
+      setAudioUrl(`${BACKEND_URL}/tts?text=${encodeURIComponent(exercises[exerciseIdx].text)}&type=pt-PT`);
     }
   }, [exercises, exerciseIdx]);
 
+  // Release mic after each recording
   useEffect(() => {
     if (!recording && mediaStream) {
       mediaStream.getTracks().forEach(track => track.stop());
@@ -62,7 +65,7 @@ export default function App() {
       formData.append("profile", profile);
       formData.append("exerciseId", exerciseIdx);
       try {
-        const resp = await axios.post("/analyze", formData);
+        const resp = await axios.post(`${BACKEND_URL}/analyze`, formData);
         setTranscript(resp.data.transcript);
         setFeedback(resp.data.feedback);
         setRecording(false);
@@ -84,6 +87,7 @@ export default function App() {
   if (!exercises.length) return <div className="loading">Loading...</div>;
   const ex = exercises[exerciseIdx];
 
+  // Helper: highlight words by index
   function renderTranscript() {
     if (!ex.transcript || !ex.highlight || !Array.isArray(ex.highlight)) return transcript;
     const words = transcript.split(/\s+/);
@@ -99,11 +103,15 @@ export default function App() {
       <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 0 0 16px" }}>
         <img src={logoUrl} alt="DizAi logo" style={{ height: 48, marginRight: 18 }} />
         <span style={{ fontSize: "2.2rem", color: "#0033A0", fontWeight: 800, fontFamily: "Nunito Sans, sans-serif" }}>
-          DizAí v1.0
+          DizAí v0.9
         </span>
       </header>
+
       <main style={{ padding: 20 }}>
-        <button className="profile-btn" onClick={() => setProfile(profile === "Johan" ? "Petra" : "Johan")}>
+        <button
+          className="profile-btn"
+          onClick={() => setProfile(profile === "Johan" ? "Petra" : "Johan")}
+        >
           Switch to {profile === "Johan" ? "Petra" : "Johan"}
         </button>
         <h2 className="exercise-text">{ex.text}</h2>
@@ -112,10 +120,16 @@ export default function App() {
         </div>
         <audio controls src={audioUrl} style={{ width: "100%", background: "#F6F9FF", margin: "18px 0 16px 0" }}></audio>
         <div style={{ display: "flex", gap: 16, marginBottom: 8 }}>
-          <button className="record-btn"
+          <button
+            className="record-btn"
             onClick={handleRecord}
             disabled={recording}
-            style={{ background: recording ? "#D49F1B" : "#0033A0", color: "#fff", fontWeight: 700 }}>
+            style={{
+              background: recording ? "#D49F1B" : "#0033A0",
+              color: "#fff",
+              fontWeight: 700
+            }}
+          >
             {recording ? "Recording..." : "🎙️ Record"}
           </button>
           {recording &&
@@ -137,14 +151,18 @@ export default function App() {
           {feedback}
         </div>
         <div style={{ display: "flex", gap: 16 }}>
-          <button className="nav-btn"
+          <button
+            className="nav-btn"
             disabled={exerciseIdx === 0}
             onClick={() => setExerciseIdx(exerciseIdx - 1)}
-            style={{ background: "#8E9775", color: "#fff", fontWeight: 700 }}>Prev</button>
-          <button className="nav-btn"
+            style={{ background: "#8E9775", color: "#fff", fontWeight: 700 }}
+          >Prev</button>
+          <button
+            className="nav-btn"
             disabled={exerciseIdx === exercises.length - 1}
             onClick={() => setExerciseIdx(exerciseIdx + 1)}
-            style={{ background: "#0033A0", color: "#fff", fontWeight: 700 }}>Next</button>
+            style={{ background: "#0033A0", color: "#fff", fontWeight: 700 }}
+          >Next</button>
         </div>
       </main>
     </div>
