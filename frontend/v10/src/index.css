@@ -1,38 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700;800&display=swap');
+
 body {
   font-family: 'Nunito Sans', 'Segoe UI', Arial, sans-serif;
   background: #F7F3E9;         /* Eggshell */
   color: #0033A0;              /* Portuguese Tile Blue */
   margin: 0;
+  min-height: 100vh;
 }
 
-button {
-  margin: 8px 0 8px 0;
-  padding: 10px 28px;
-  border-radius: 20px;
-  border: none;
-  background: #0033A0;
-  color: #fff;
-  font-weight: 700;
-  font-size: 1.05rem;
-  transition: background 0.18s, color 0.18s;
-  box-shadow: 0 2px 12px #0033A022;
-  cursor: pointer;
+.dizai-app {
+  max-width: 480px;
+  margin: 36px auto 0 auto;
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: 0 6px 28px #0033A020;
+  padding-bottom: 36px;
 }
 
-button:disabled {
-  background: #8E9775;
-  color: #ddd;
-  cursor: not-allowed;
-}
-
-audio {
-  margin-top: 16px;
-  width: 100%;
-  background: #f7f3e9;
+header {
+  background: #F7F3E9;
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 28px 0 0 24px;
 }
 
 .exercise-text {
-  font-size: 2rem;
+  font-size: 2.1rem;
   color: #0033A0;
   font-weight: 800;
   margin: 24px 0 12px 0;
@@ -41,19 +37,22 @@ audio {
 
 .ipa {
   font-family: "Nunito Sans", "Segoe UI", Arial, sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.08rem;
   margin-bottom: 10px;
   color: #0033A0;
 }
 
 .transcript {
-  margin: 16px 0 8px 0;
-  font-size: 1.1rem;
+  margin: 18px 0 6px 0;
+  font-size: 1.09rem;
 }
 
 .feedback {
-  margin: 8px 0 12px 0;
+  margin: 8px 0 16px 0;
   min-height: 24px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-size: 1.15rem;
 }
 
 .profile-btn {
@@ -62,6 +61,16 @@ audio {
   border-radius: 18px;
   padding: 8px 20px;
   margin-bottom: 18px;
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 2px 8px #0033A020;
+  cursor: pointer;
+  transition: background 0.16s;
+}
+
+.profile-btn:hover {
+  background: #001D4A;
 }
 
 .record-btn {
@@ -69,13 +78,29 @@ audio {
   font-size: 1.15rem;
   border-radius: 18px;
   padding: 8px 28px;
+  color: #fff;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  transition: background 0.16s;
+}
+
+.record-btn[disabled] {
+  background: #8E9775;
+  color: #ddd;
+  cursor: not-allowed;
 }
 
 .stop-btn {
-  background: #D1495B;
+  background: #D1495B;      /* Terracotta Red */
   font-size: 1.15rem;
   border-radius: 18px;
   padding: 8px 28px;
+  color: #fff;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  transition: background 0.16s;
 }
 
 .nav-btn {
@@ -83,11 +108,58 @@ audio {
   font-size: 1.08rem;
   border-radius: 16px;
   padding: 8px 22px;
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  transition: background 0.18s;
+}
+
+.nav-btn:disabled {
+  background: #F7F3E9;
+  color: #8E9775;
+  cursor: not-allowed;
+}
+
+audio {
+  margin-top: 18px;
+  margin-bottom: 10px;
+  width: 100%;
+  background: #f7f3e9;
+  border-radius: 14px;
 }
 
 .loading {
   color: #0033A0;
   font-size: 1.5rem;
-  padding: 40px;
+  padding: 44px;
   text-align: center;
+  font-weight: 700;
+}
+
+.highlight {
+  background: #FFD580;
+  color: #D1495B;
+  font-weight: 700;
+  border-radius: 5px;
+  padding: 2px 4px;
+}
+
+@media (max-width: 600px) {
+  .dizai-app {
+    max-width: 99vw;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding-bottom: 30px;
+  }
+  header {
+    padding-left: 9px;
+    padding-top: 18px;
+  }
+  .exercise-text {
+    font-size: 1.5rem;
+  }
 }
